@@ -1,8 +1,9 @@
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app_barbearia/Pages/HomePage.dart';
 import 'package:app_barbearia/widgets/Button.dart';
 import 'package:app_barbearia/widgets/Field.dart';
 import 'package:app_barbearia/widgets/FieldPassword.dart';
-import 'package:flutter/material.dart';
 
 class LoginPage extends StatefulWidget {
   @override
@@ -11,9 +12,7 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-
   final _focusPassword = FocusNode();
-
   final _tLogin = TextEditingController();
   final _tPassword = TextEditingController();
 
@@ -25,30 +24,20 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        children: [
-          _background(),
-          _body(),
-        ],
-      ),
-    );
-  }
-
-  @override
   void dispose() {
+    _tLogin.dispose();
+    _tPassword.dispose();
+    _focusPassword.dispose();
     super.dispose();
   }
 
-_background() {
-  return Container(
-    height: double.infinity,
-    width: double.infinity,
-    color: Colors.blue[900], // Dark blue color
-  );
-}
-
+  _background() {
+    return Container(
+      height: double.infinity,
+      width: double.infinity,
+      color: Colors.blue[900], // Dark blue color
+    );
+  }
 
   _body() {
     return Container(
@@ -91,17 +80,10 @@ _background() {
             focusNode: _focusPassword,
           ),
           const SizedBox(height: 10),
-        Button(
-          label: "Entrar",
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const HomePage()), // Replace HomePage() with your actual home page widget
-            );
-          },
-        )
-
-
+          Button(
+            label: "Entrar",
+            onPressed: _onLoginPressed,
+          ),
         ],
       ),
     );
@@ -122,4 +104,49 @@ _background() {
     );
   }
 
+  void _onLoginPressed() async {
+    final username = _tLogin.text;
+    final password = _tPassword.text;
+
+    // Verifica se o formulário é válido
+    if (_formKey.currentState?.validate() ?? false) {
+      setState(() {
+        showProgress = true;
+      });
+
+      if ((username == 'user1' && password == '123') ||
+          (username == 'user2' && password == '123')) {
+        
+        // Store the username in shared preferences
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        await prefs.setString('loggedInUser', username);
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => HomePage()), // Página do usuário
+        );
+      } else {
+        setState(() {
+          showProgress = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Login ou senha inválidos')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(
+        children: [
+          _background(),
+          _body(),
+          if (showProgress)
+            Center(child: CircularProgressIndicator()),
+        ],
+      ),
+    );
+  }
 }

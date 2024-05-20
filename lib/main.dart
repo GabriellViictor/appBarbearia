@@ -1,12 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:app_barbearia/Pages/LoginPage.dart';
+import 'package:app_barbearia/Utils/DatabaseHelper.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await showRegisteredUsers();
   runApp(const MyApp());
 }
 
+
+Future<void> showRegisteredUsers() async {
+  final dbHelper = DatabaseHelper.instance;
+  final users = await dbHelper.getUsers(); 
+  print('Usuários cadastrados:');
+  users.forEach((user) {
+    print('ID: ${user['id']}, Username: ${user['username']}, Password: ${user['password']}, Type: ${user['type']}');
+  });
+}
+
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
