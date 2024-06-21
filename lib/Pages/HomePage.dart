@@ -1,12 +1,14 @@
-import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:app_barbearia/widgets/CustomBottomNavigationBar.dart';
 import 'package:app_barbearia/Pages/Agendamento.dart';
 import 'package:app_barbearia/Pages/AgendamentoBarbeiro.dart';
 import 'package:app_barbearia/Pages/ProgilePage.dart';
+import 'package:app_barbearia/api/ApointmentApi.dart';
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:app_barbearia/widgets/CustomBottomNavigationBar.dart';
+import 'package:app_barbearia/Model/Horario.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({Key? key});
+  const HomePage({Key? key}) : super(key: key);
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -15,11 +17,13 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   String? _username;
   String? _userType;
+  late Future<List<Horario>> _horariosIndisponiveis;
 
   @override
   void initState() {
     super.initState();
     _loadUser();
+    _horariosIndisponiveis = AppointmentApi().getHorariosIndisponiveis();
   }
 
   Future<void> _loadUser() async {
@@ -39,28 +43,47 @@ class _HomePageState extends State<HomePage> {
       body: _body(),
       bottomNavigationBar: CustomBottomNavigationBar(
         currentIndex: 1,
-        onTap: (index) {
-          if (index == 2) {
-            _handleScheduleButton();
-          } else {
-            _handleProfileButton();
-          }
-        },
+        onTap: _handleNavigationTap,
       ),
     );
   }
 
   Widget _body() {
-    return ListView(
-      padding: const EdgeInsets.all(16.0),
-      children: [
-        _buildAppointmentCard(),
-        _buildAppointmentCard(),
-      ],
+    return FutureBuilder<List<Horario>>(
+      future: _horariosIndisponiveis,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator());
+        } else if (snapshot.hasError) {
+          return Center(child: Text('Erro: ${snapshot.error}'));
+        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return Center(child: Text('Nenhum horário agendado'));
+        }
+
+        List<Horario> horarios = snapshot.data!;
+        return ListView.builder(
+          padding: const EdgeInsets.all(16.0),
+          itemCount: horarios.length,
+          itemBuilder: (context, index) {
+            Horario horario = horarios[index];
+            return _buildAppointmentCard(horario);
+          },
+        );
+      },
     );
   }
 
-  Widget _buildAppointmentCard() {
+  Widget _buildAppointmentCard(Horario horario) {
+    String? date, time;
+
+    try {
+      date = horario.horario.substring(0, 10);
+      time = horario.horario.substring(11);
+    } catch (e) {
+      date = 'Data inválida';
+      time = 'Hora inválida';
+    }
+
     return Card(
       elevation: 4.0,
       margin: const EdgeInsets.symmetric(vertical: 6.0),
@@ -69,7 +92,7 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
@@ -89,7 +112,7 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
             SizedBox(height: 8.0),
-            const Row(
+            Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 Icon(Icons.access_time, color: Colors.grey),
@@ -97,21 +120,22 @@ class _HomePageState extends State<HomePage> {
                 Text('30 min', style: TextStyle(fontSize: 16.0, color: Colors.grey)),
               ],
             ),
-            const SizedBox(height: 8.0),
+            SizedBox(height: 8.0),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Column(
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Data: 13/05/2024', style: TextStyle(fontSize: 16.0)),
                     SizedBox(height: 4.0),
-                    Text('Hora: 10:00', style: TextStyle(fontSize: 16.0)),
+                    Text('Data: $date', style: TextStyle(fontSize: 16.0)),
+                    SizedBox(height: 4.0),
+                    Text('Hora: $time', style: TextStyle(fontSize: 16.0)),
                   ],
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    _handleCancelAppointment(); 
+                    _handleCancelAppointment(horario);
                   },
                   style: ButtonStyle(
                     backgroundColor: MaterialStateProperty.all(Colors.red),
@@ -126,6 +150,16 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  void _handleNavigationTap(int index) {
+    if (index == 0) {
+      _handleProfileButton();
+    } else if (index == 1) {
+      _handleScheduleButton();
+    }else {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const ScheduleServicePage()));
+    }
+  }
+
   void _handleScheduleButton() {
     if (_username == 'usuario1') {
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const ScheduleServicePage()));
@@ -134,7 +168,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _handleCancelAppointment() {
+  void _handleCancelAppointment(Horario horario) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -144,14 +178,22 @@ class _HomePageState extends State<HomePage> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.of(context).pop(); 
+                Navigator.of(context).pop();
               },
               child: const Text('Cancelar'),
             ),
             TextButton(
               onPressed: () {
-                // Implementar lógica para cancelamento
-                Navigator.of(context).pop(); 
+                // Implementar lógica para cancelamento usando a API
+                AppointmentApi().desmarcarHorario(horario.horario).then((message) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+                  setState(() {
+                    _horariosIndisponiveis = AppointmentApi().getHorariosIndisponiveis();
+                  });
+                }).catchError((error) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao cancelar: $error')));
+                });
+                Navigator.of(context).pop();
               },
               child: const Text('Confirmar'),
             ),
