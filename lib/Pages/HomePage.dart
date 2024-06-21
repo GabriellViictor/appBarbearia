@@ -1,9 +1,9 @@
-import 'package:app_barbearia/Pages/AgendamentoBarbeiro.dart';
-import 'package:app_barbearia/Pages/ProgilePage.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app_barbearia/widgets/CustomBottomNavigationBar.dart';
 import 'package:app_barbearia/Pages/Agendamento.dart';
+import 'package:app_barbearia/Pages/AgendamentoBarbeiro.dart';
+import 'package:app_barbearia/Pages/ProgilePage.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key});
@@ -34,25 +34,16 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Agendamentos'), // Adicionando o título "Agendamentos" na barra de navegação
+        title: const Text('Agendamentos'),
       ),
-      body: Stack(
-        children: [
-          _body(),
-        ],
-      ),
+      body: _body(),
       bottomNavigationBar: CustomBottomNavigationBar(
         currentIndex: 1,
         onTap: (index) {
           if (index == 2) {
-            // Verifica o tipo de usuário e redireciona para a página apropriada
-            if (_username == 'user1') {
-              Navigator.push(context, MaterialPageRoute(builder: (context) => ScheduleServicePage()));
-            } else if (_username == 'user2') {
-              Navigator.push(context, MaterialPageRoute(builder: (context) => BarberSchedulePage()));
-            }
+            _handleScheduleButton();
           } else {
-            Navigator.push(context, MaterialPageRoute(builder: (context) => ProfilePage()));
+            _handleProfileButton();
           }
         },
       ),
@@ -78,7 +69,6 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Primeira linha com ícone, nome do cliente e valor
             const Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -99,7 +89,6 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
             SizedBox(height: 8.0),
-            // Segunda linha com duração, alinhada à direita
             const Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -109,7 +98,6 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
             const SizedBox(height: 8.0),
-            // Terceira linha com data e hora à esquerda e botão de cancelamento à direita
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -123,7 +111,7 @@ class _HomePageState extends State<HomePage> {
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    // Adicione a lógica para cancelar o agendamento aqui
+                    _handleCancelAppointment(); 
                   },
                   style: ButtonStyle(
                     backgroundColor: MaterialStateProperty.all(Colors.red),
@@ -136,5 +124,44 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
+  }
+
+  void _handleScheduleButton() {
+    if (_username == 'usuario1') {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const ScheduleServicePage()));
+    } else if (_username == 'usuario2') {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const BarberSchedulePage()));
+    }
+  }
+
+  void _handleCancelAppointment() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Cancelar Agendamento'),
+          content: Text('Deseja realmente cancelar este agendamento?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); 
+              },
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () {
+                // Implementar lógica para cancelamento
+                Navigator.of(context).pop(); 
+              },
+              child: const Text('Confirmar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _handleProfileButton() {
+    Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => ProfilePage()));
   }
 }

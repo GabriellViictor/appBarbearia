@@ -1,8 +1,11 @@
+import 'dart:convert';
 import 'package:app_barbearia/Pages/ProgilePage.dart';
-import 'package:app_barbearia/Utils/DataBaseHelper.dart';
+import 'package:app_barbearia/api/ApointmentApi.dart';
 import 'package:flutter/material.dart';
-import 'package:app_barbearia/widgets/CustomBottomNavigationBar.dart';
+import 'package:http/http.dart' as http;
 import 'package:app_barbearia/Pages/HomePage.dart';
+import 'package:app_barbearia/widgets/CustomBottomNavigationBar.dart';
+import 'package:app_barbearia/Model/Horario.dart';
 
 class ScheduleServicePage extends StatefulWidget {
   const ScheduleServicePage({Key? key}) : super(key: key);
@@ -21,11 +24,53 @@ class _ScheduleServicePageState extends State<ScheduleServicePage> {
     {'name': 'Barba', 'price': 20.0, 'duration': '20 min'}
   ];
 
-  final List<String> times = [
-    '09:00', '10:00', '11:00', '12:00',
-    '13:00', '14:00', '15:00', '16:00',
-    '17:00', '18:00', '19:00', '20:00'
-  ];
+  List<String> _availableTimes = []; // Lista de horários disponíveis para a data selecionada
+
+  final AppointmentApi _api = AppointmentApi(); // Instância da classe AppointmentApi
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAvailableTimes();
+  }
+
+  Future<void> _loadAvailableTimes() async {
+    try {
+      List<Horario> availableTimes = await _api.getHorariosDisponiveis();
+      setState(() {
+        _availableTimes = availableTimes.map((horario) => horario.horario).toList();
+      });
+    } catch (e) {
+      print('Erro ao carregar horários disponíveis: $e');
+    }
+  }
+
+  Future<void> _markTime(String time) async {
+    String baseUrl = 'http://54.234.198.193:3333';
+    String endpoint = '/marcar-horario';
+    Uri uri = Uri.parse(baseUrl + endpoint);
+    Map<String, String> headers = {'Content-Type': 'application/json'};
+    String body = jsonEncode({'horario': time});
+
+    try {
+      final response = await http.post(uri, headers: headers, body: body);
+      if (response.statusCode == 200) {
+        setState(() {
+          _selectedTime = time;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Horário marcado para $_selectedDay às $_selectedTime')),
+        );
+      } else {
+        throw Exception('Erro ao marcar horário: ${response.body}');
+      }
+    } catch (e) {
+      print('Erro ao conectar ao servidor: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Erro ao conectar ao servidor')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,11 +83,15 @@ class _ScheduleServicePageState extends State<ScheduleServicePage> {
         currentIndex: 2,
         onTap: (index) {
           if (index == 1) {
-            Navigator.push(
-                context, MaterialPageRoute(builder: (context) => HomePage()));
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => HomePage()),
+            );
           } else if (index == 0) {
-            Navigator.push(
-                context, MaterialPageRoute(builder: (context) => ProfilePage()));
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => ProfilePage()),
+            );
           }
         },
       ),
@@ -133,58 +182,58 @@ class _ScheduleServicePageState extends State<ScheduleServicePage> {
       onTap: _selectDate,
     );
   }
-Widget _buildTimeSelection() {
-  return FutureBuilder<List<String>>(
-    future: DatabaseHelper.instance.getAvailableTimes(_selectedDay),
-    builder: (context, snapshot) {
-      if (snapshot.connectionState == ConnectionState.waiting) {
-        return CircularProgressIndicator();
-      } else if (snapshot.hasError) {
-        return Text('Erro ao carregar horários disponíveis');
-      } else {
-        List<String> availableTimes = snapshot.data ?? [];
-        if (availableTimes.isNotEmpty) {
-          return Expanded(
-            child: GridView.builder(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                childAspectRatio: 2.5,
-                mainAxisSpacing: 8.0,
-                crossAxisSpacing: 8.0,
+
+  Widget _buildTimeSelection() {
+    if (_availableTimes.isEmpty) {
+      return Text('Não há horários disponíveis para esta data');
+    }
+
+    return Expanded(
+      child: GridView.builder(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          childAspectRatio: 2.5,
+          mainAxisSpacing: 8.0,
+          crossAxisSpacing: 8.0,
+        ),
+        itemCount: _availableTimes.length,
+        itemBuilder: (context, index) {
+          final time = _availableTimes[index];
+          bool isTimeSelected = _selectedTime == time;
+          bool isTimeAvailable = !_isTimeAlreadySelected(time);
+
+          return ElevatedButton(
+            onPressed: isTimeAvailable ? () => _selectTime(time) : null,
+            style: ButtonStyle(
+              backgroundColor: MaterialStateProperty.all(
+                isTimeSelected ? Colors.blue : (isTimeAvailable ? Colors.grey[300] : Colors.red),
               ),
-              itemCount: availableTimes.length,
-              itemBuilder: (context, index) {
-                final time = availableTimes[index];
-                return ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      _selectedTime = time;
-                    });
-                  },
-                  style: ButtonStyle(
-                    backgroundColor: MaterialStateProperty.all(
-                      _selectedTime == time ? Colors.blue : Colors.grey[300],
-                    ),
-                    foregroundColor: MaterialStateProperty.all(
-                      _selectedTime == time ? Colors.white : Colors.black,
-                    ),
-                  ),
-                  child: Text(time),
-                );
-              },
+              foregroundColor: MaterialStateProperty.all(
+                isTimeSelected ? Colors.white : Colors.black,
+              ),
             ),
+            child: Text(time),
           );
-        } else {
-          return Text('Não há horários disponíveis para esta data');
-        }
-      }
-    },
-  );
-}
+        },
+      ),
+    );
+  }
+
+  bool _isTimeAlreadySelected(String time) {
+    // Implemente a lógica para verificar se o horário já foi selecionado
+    // Esta implementação depende da lógica de negócio da sua aplicação
+    return false;
+  }
+
+  void _selectTime(String time) {
+    setState(() {
+      _selectedTime = time;
+    });
+  }
 
   Widget _buildTotalAndSaveButton() {
     double totalPrice = _selectedServices.fold(
-        0.0, (sum, service) => sum + services.firstWhere((item) => item['name'] == service)['price']);
+      0.0, (sum, service) => sum + services.firstWhere((item) => item['name'] == service)['price']);
 
     return Center(
       child: Column(
@@ -193,9 +242,7 @@ Widget _buildTimeSelection() {
           ElevatedButton(
             onPressed: () {
               if (_selectedServices.isNotEmpty && _selectedTime != null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Serviço agendado para ${_selectedDay.toLocal().toString().split(' ')[0]} às $_selectedTime')),
-                );
+                _saveAppointment();
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Por favor, selecione um serviço e um horário')),
@@ -209,6 +256,24 @@ Widget _buildTimeSelection() {
     );
   }
 
+  void _saveAppointment() async {
+    try {
+      await _api.marcarHorario(_selectedTime!);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Serviço agendado para $_selectedDay às $_selectedTime')),
+      );
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => HomePage()),
+      );
+    } catch (e) {
+      print('Erro ao marcar horário: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Erro ao marcar horário')),
+      );
+    }
+  }
+
   Future<void> _selectDate() async {
     DateTime? picked = await showDatePicker(
       context: context,
@@ -220,6 +285,7 @@ Widget _buildTimeSelection() {
     if (picked != null && picked != _selectedDay) {
       setState(() {
         _selectedDay = picked;
+        _loadAvailableTimes();
       });
     }
   }

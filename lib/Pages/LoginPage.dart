@@ -1,6 +1,7 @@
+import 'package:app_barbearia/Pages/Agendamento.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:app_barbearia/Pages/HomePage.dart';
+import 'package:app_barbearia/api/AuthApi.dart';
+import 'package:app_barbearia/Pages/HomePage.dart';  // Certifique-se de importar a HomePage corretamente
 import 'package:app_barbearia/widgets/Button.dart';
 import 'package:app_barbearia/widgets/Field.dart';
 import 'package:app_barbearia/widgets/FieldPassword.dart';
@@ -15,13 +16,9 @@ class _LoginPageState extends State<LoginPage> {
   final _focusPassword = FocusNode();
   final _tLogin = TextEditingController();
   final _tPassword = TextEditingController();
+  bool _showProgress = false;
 
-  bool showProgress = false;
-
-  @override
-  void initState() {
-    super.initState();
-  }
+  final LoginService _loginService = LoginService(baseUrl: 'http://54.234.198.193:3333');
 
   @override
   void dispose() {
@@ -31,15 +28,27 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  _background() {
-    return Container(
-      height: double.infinity,
-      width: double.infinity,
-      color: Colors.blue[900], // Dark blue color
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(
+        children: [
+          _background(),
+          _body(),
+        ],
+      ),
     );
   }
 
-  _body() {
+  Widget _background() {
+    return Container(
+      height: double.infinity,
+      width: double.infinity,
+      color: Colors.blue[900],
+    );
+  }
+
+  Widget _body() {
     return Container(
       padding: const EdgeInsets.fromLTRB(40, 0, 40, 0),
       child: Column(
@@ -49,16 +58,17 @@ class _LoginPageState extends State<LoginPage> {
           _logo(),
           _form(),
           _resetPassword(),
+          if (_showProgress) CircularProgressIndicator(), 
         ],
       ),
     );
   }
 
-  _logo() {
+  Widget _logo() {
     return Image.asset("lib/assets/images/logo.png");
   }
 
-  _form() {
+  Widget _form() {
     return Form(
       key: _formKey,
       child: Column(
@@ -82,16 +92,18 @@ class _LoginPageState extends State<LoginPage> {
           const SizedBox(height: 10),
           Button(
             label: "Entrar",
-            onPressed: _onLoginPressed,
+            onPressed: _login,
           ),
         ],
       ),
     );
   }
 
-  _resetPassword() {
+  Widget _resetPassword() {
     return InkWell(
-      onTap: () => Navigator.pushNamed(context, "/"),
+      onTap: () {
+        // Implemente aqui a lógica para redefinir a senha
+      },
       child: Text(
         "Esqueci minha senha",
         style: TextStyle(
@@ -104,49 +116,66 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  void _onLoginPressed() async {
-    final username = _tLogin.text;
-    final password = _tPassword.text;
+  void _login() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
-    // Verifica se o formulário é válido
-    if (_formKey.currentState?.validate() ?? false) {
-      setState(() {
-        showProgress = true;
-      });
+    setState(() {
+      _showProgress = true;
+    });
 
-      if ((username == 'user1' && password == '123') ||
-          (username == 'user2' && password == '123')) {
-        
-        // Store the username in shared preferences
-        SharedPreferences prefs = await SharedPreferences.getInstance();
-        await prefs.setString('loggedInUser', username);
+    final login = _tLogin.text;
+    final senha = _tPassword.text;
 
-        Navigator.pushReplacement(
+    print('Login: $login');
+
+    try {
+      final response = await _loginService.login(login, senha);
+
+      if (response.ok) {
+        // Login bem-sucedido
+        Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => HomePage()), // Página do usuário
+          MaterialPageRoute(builder: (context) => HomePage()),  
         );
       } else {
-        setState(() {
-          showProgress = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Login ou senha inválidos')),
+        showDialog(
+          context: context,
+          builder: (BuildContext context) => AlertDialog(
+            title: Text('Error'),
+            content: Text(response.msg),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: Text('OK'),
+              ),
+            ],
+          ),
         );
       }
+    } catch (e) {
+      showDialog(
+        context: context,
+        builder: (BuildContext context) => AlertDialog(
+          title: Text('Error'),
+          content: Text('Falha ao realizar login. Tente novamente!'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      setState(() {
+        _showProgress = false;
+      });
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        children: [
-          _background(),
-          _body(),
-          if (showProgress)
-            Center(child: CircularProgressIndicator()),
-        ],
-      ),
-    );
   }
 }
