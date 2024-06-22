@@ -23,7 +23,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _loadUser();
-    _horariosIndisponiveis = AppointmentApi().getHorariosIndisponiveis();
+    _refreshHorarios();
   }
 
   Future<void> _loadUser() async {
@@ -31,6 +31,12 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _username = prefs.getString('loggedInUser');
       _userType = prefs.getString('userType');
+    });
+  }
+
+  Future<void> _refreshHorarios() async {
+    setState(() {
+      _horariosIndisponiveis = AppointmentApi().getHorariosIndisponiveis();
     });
   }
 
@@ -74,13 +80,11 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildAppointmentCard(Horario horario) {
-    String? date, time;
+    String? time;
 
     try {
-      date = horario.horario.substring(0, 10);
-      time = horario.horario.substring(11);
+      time = horario.horario;  
     } catch (e) {
-      date = 'Data inválida';
       time = 'Hora inválida';
     }
 
@@ -92,7 +96,7 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            const Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
@@ -112,7 +116,7 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
             SizedBox(height: 8.0),
-            Row(
+            const Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 Icon(Icons.access_time, color: Colors.grey),
@@ -120,16 +124,14 @@ class _HomePageState extends State<HomePage> {
                 Text('30 min', style: TextStyle(fontSize: 16.0, color: Colors.grey)),
               ],
             ),
-            SizedBox(height: 8.0),
+            const SizedBox(height: 8.0),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(height: 4.0),
-                    Text('Data: $date', style: TextStyle(fontSize: 16.0)),
-                    SizedBox(height: 4.0),
+                    const SizedBox(height: 4.0),
                     Text('Hora: $time', style: TextStyle(fontSize: 16.0)),
                   ],
                 ),
@@ -155,7 +157,7 @@ class _HomePageState extends State<HomePage> {
       _handleProfileButton();
     } else if (index == 1) {
       _handleScheduleButton();
-    }else {
+    } else {
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const ScheduleServicePage()));
     }
   }
@@ -184,16 +186,13 @@ class _HomePageState extends State<HomePage> {
             ),
             TextButton(
               onPressed: () {
-                // Implementar lógica para cancelamento usando a API
                 AppointmentApi().desmarcarHorario(horario.horario).then((message) {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
-                  setState(() {
-                    _horariosIndisponiveis = AppointmentApi().getHorariosIndisponiveis();
-                  });
+                  _refreshHorarios(); // Atualizar a lista de horários
+                  Navigator.of(context).pop();
                 }).catchError((error) {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao cancelar: $error')));
                 });
-                Navigator.of(context).pop();
               },
               child: const Text('Confirmar'),
             ),
