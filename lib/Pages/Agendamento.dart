@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'package:app_barbearia/Pages/ProgilePage.dart';
+import 'package:app_barbearia/Utils/Validacoes.dart';
 import 'package:app_barbearia/api/ApointmentApi.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:app_barbearia/Pages/HomePage.dart';
 import 'package:app_barbearia/widgets/CustomBottomNavigationBar.dart';
 import 'package:app_barbearia/Model/Horario.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ScheduleServicePage extends StatefulWidget {
   const ScheduleServicePage({Key? key}) : super(key: key);
@@ -18,15 +20,23 @@ class _ScheduleServicePageState extends State<ScheduleServicePage> {
   DateTime _selectedDay = DateTime.now();
   Set<String> _selectedServices = {};
   String? _selectedTime;
+    String? _userType;
+
+  Future<void> _loadUser() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _userType = prefs.getString('userType');
+    });
+  }
 
   final List<Map<String, dynamic>> services = [
     {'name': 'Corte de Cabelo', 'price': 30.0, 'duration': '30 min'},
     {'name': 'Barba', 'price': 20.0, 'duration': '20 min'}
   ];
 
-  List<String> _availableTimes = []; // Lista de horários disponíveis para a data selecionada
+  List<String> _availableTimes = []; 
 
-  final AppointmentApi _api = AppointmentApi(); // Instância da classe AppointmentApi
+  final AppointmentApi _api = AppointmentApi();
 
   @override
   void initState() {
@@ -34,43 +44,23 @@ class _ScheduleServicePageState extends State<ScheduleServicePage> {
     _loadAvailableTimes();
   }
 
-  Future<void> _loadAvailableTimes() async {
-    try {
-      List<Horario> availableTimes = await _api.getHorariosDisponiveis();
-      setState(() {
-        _availableTimes = availableTimes.map((horario) => horario.horario).toList();
-      });
-    } catch (e) {
-      print('Erro ao carregar horários disponíveis: $e');
-    }
+Future<void> _loadAvailableTimes() async {
+  try {
+    print('Carregando horários disponíveis para $_selectedDay');
+    List<Horario> availableTimes = await _api.getHorariosDisponiveis();
+    
+    setState(() {
+      _availableTimes = availableTimes
+          .where((horario) => horario.disponivel) 
+          .map((horario) => horario.horarioTexto)
+          .toList();
+      
+      print('Horários carregados: $_availableTimes');
+    });
+  } catch (e) {
+    print('Erro ao carregar horários disponíveis: $e');
   }
-
-  Future<void> _markTime(String time) async {
-    String baseUrl = 'http://54.234.198.193:3333';
-    String endpoint = '/marcar-horario';
-    Uri uri = Uri.parse(baseUrl + endpoint);
-    Map<String, String> headers = {'Content-Type': 'application/json'};
-    String body = jsonEncode({'horario': time});
-
-    try {
-      final response = await http.post(uri, headers: headers, body: body);
-      if (response.statusCode == 200) {
-        setState(() {
-          _selectedTime = time;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Horário marcado para $_selectedDay às $_selectedTime')),
-        );
-      } else {
-        throw Exception('Erro ao marcar horário: ${response.body}');
-      }
-    } catch (e) {
-      print('Erro ao conectar ao servidor: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Erro ao conectar ao servidor')),
-      );
-    }
-  }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -81,19 +71,7 @@ class _ScheduleServicePageState extends State<ScheduleServicePage> {
       body: _buildBody(),
       bottomNavigationBar: CustomBottomNavigationBar(
         currentIndex: 2,
-        onTap: (index) {
-          if (index == 1) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => HomePage()),
-            );
-          } else if (index == 0) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => ProfilePage()),
-            );
-          }
-        },
+        onTap: _handleNavigationTap, userType: '',
       ),
     );
   }
@@ -256,23 +234,57 @@ class _ScheduleServicePageState extends State<ScheduleServicePage> {
     );
   }
 
-  void _saveAppointment() async {
-    try {
-      await _api.marcarHorario(_selectedTime!);
+void _saveAppointment() async {
+  Validacoes validacoes = new Validacoes();
+
+  try {
+    if (_selectedServices.isEmpty || _selectedTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Serviço agendado para $_selectedDay às $_selectedTime')),
+        const SnackBar(content: Text('Por favor, selecione um serviço e um horário')),
       );
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => HomePage()),
-      );
-    } catch (e) {
-      print('Erro ao marcar horário: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Erro ao marcar horário')),
-      );
+      return;
     }
+
+    Horario horarioTeste= Horario(
+      id: "",
+      horarioId: _selectedTime as String,
+      horarioTexto: _selectedTime as String,
+      disponivel: true,
+    );
+    if(!validacoes.verificaMarcarHorario(horarioTeste,_userType)){
+      return;
+    }
+
+    final selectedService = services.firstWhere((service) => _selectedServices.contains(service['name']));
+    final String servico = selectedService['name'];
+    final double valor = selectedService['price'];
+    final int minuto = int.parse(selectedService['duration'].split(' ')[0]); // Extrai minutos do tempo
+
+    String data = '${_selectedDay.year}-${_selectedDay.month.toString().padLeft(2, '0')}-${_selectedDay.day.toString().padLeft(2, '0')}';
+
+    await _api.marcarHorario(
+      horarioId: _selectedTime!, 
+      data: data,
+      servico: servico,
+      valor: valor,
+      minuto: minuto,
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Serviço agendado para $_selectedDay às $_selectedTime')),
+    );
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => HomePage()),
+    );
+  } catch (e) {
+    print('Erro ao marcar horário: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Erro ao marcar horário')),
+    );
   }
+}
 
   Future<void> _selectDate() async {
     DateTime? picked = await showDatePicker(
@@ -287,6 +299,14 @@ class _ScheduleServicePageState extends State<ScheduleServicePage> {
         _selectedDay = picked;
         _loadAvailableTimes();
       });
+    }
+  }
+
+  void _handleNavigationTap(int index) {
+    if (index == 0) {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => ProfilePage()));
+    } else if (index == 1) {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage()));
     }
   }
 }

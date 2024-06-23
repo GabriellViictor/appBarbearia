@@ -1,5 +1,12 @@
+import 'package:app_barbearia/Pages/Agendamento.dart';
+import 'package:app_barbearia/Pages/ProgilePage.dart';
+import 'package:app_barbearia/Utils/Validacoes.dart';
+import 'package:app_barbearia/api/ApointmentApi.dart';
 import 'package:flutter/material.dart';
-import 'package:app_barbearia/Utils/DataBaseHelper.dart';
+import 'package:app_barbearia/widgets/CustomBottomNavigationBar.dart';
+import 'package:app_barbearia/Model/Horario.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'HomePage.dart';
 
 class BarberSchedulePage extends StatefulWidget {
   const BarberSchedulePage({Key? key}) : super(key: key);
@@ -9,12 +16,25 @@ class BarberSchedulePage extends StatefulWidget {
 }
 
 class _BarberSchedulePageState extends State<BarberSchedulePage> {
-  final List<String> _availableTimes = [
-    '09:00', '10:00', '11:00', '12:00',
-    '13:00', '14:00', '15:00', '16:00',
-    '17:00', '18:00'
-  ];
-  List<String> _selectedUnavailableTimes = [];
+  late Future<List<Horario>> _availableTimesFuture;
+  late Future<List<Horario>> _unavailableTimesFuture;
+  List<Horario> _selectedUnavailableTimes = [];
+  String? _userType;
+
+
+  Future<void> _loadUser() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _userType = prefs.getString('userType');
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _availableTimesFuture = AppointmentApi().getHorariosDisponiveis();
+    _unavailableTimesFuture = AppointmentApi().getHorariosIndisponiveis();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,10 +47,17 @@ class _BarberSchedulePageState extends State<BarberSchedulePage> {
         onPressed: _saveSelectedTimes,
         child: Icon(Icons.save),
       ),
+      bottomNavigationBar: CustomBottomNavigationBar(
+        currentIndex: 1,
+        onTap: _handleNavigationTap,
+        userType: '',
+      ),
     );
   }
 
   Widget _buildBody() {
+    Validacoes validacoes = new Validacoes();
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -40,22 +67,36 @@ class _BarberSchedulePageState extends State<BarberSchedulePage> {
           style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
         ),
         Expanded(
-          child: ListView.builder(
-            itemCount: _availableTimes.length,
-            itemBuilder: (context, index) {
-              final time = _availableTimes[index];
-              final isUnavailable = _selectedUnavailableTimes.contains(time);
-              return ListTile(
-                title: Text(time),
-                trailing: isUnavailable ? Icon(Icons.check, color: Colors.red) : null,
-                onTap: () {
-                  setState(() {
-                    if (isUnavailable) {
-                      _selectedUnavailableTimes.remove(time);
-                    } else {
-                      _selectedUnavailableTimes.add(time);
-                    }
-                  });
+          child: FutureBuilder<List<Horario>>(
+            future: _availableTimesFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Center(child: CircularProgressIndicator());
+              } else if (snapshot.hasError) {
+                return Center(child: Text('Erro: ${snapshot.error}'));
+              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return Center(child: Text('Nenhum horário disponível'));
+              }
+
+              List<Horario> availableTimes = snapshot.data!;
+              return ListView.builder(
+                itemCount: availableTimes.length,
+                itemBuilder: (context, index) {
+                  final horario = availableTimes[index];
+                  final isUnavailable = _selectedUnavailableTimes.contains(horario);
+                  return ListTile(
+                    title: Text(horario.horarioTexto),
+                    trailing: isUnavailable ? Icon(Icons.check, color: Colors.red) : null,
+                    onTap: () {
+                      setState(() {
+                        if (isUnavailable) {
+                          _selectedUnavailableTimes.remove(horario);
+                        } else {
+                          _selectedUnavailableTimes.add(horario);
+                        }
+                      });
+                    },
+                  );
                 },
               );
             },
@@ -67,20 +108,46 @@ class _BarberSchedulePageState extends State<BarberSchedulePage> {
           style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
         ),
         Expanded(
-          child: ListView.builder(
-            itemCount: _selectedUnavailableTimes.length,
-            itemBuilder: (context, index) {
-              final time = _selectedUnavailableTimes[index];
-              return ListTile(
-                title: Text(time),
-                trailing: IconButton(
-                  icon: Icon(Icons.delete),
-                  onPressed: () {
-                    setState(() {
-                      _selectedUnavailableTimes.removeAt(index);
-                    });
-                  },
-                ),
+          child: FutureBuilder<List<Horario>>(
+            future: _unavailableTimesFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Center(child: CircularProgressIndicator());
+              } else if (snapshot.hasError) {
+                return Center(child: Text('Erro: ${snapshot.error}'));
+              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return Center(child: Text('Nenhum horário indisponível'));
+              }
+
+              List<Horario> unavailableTimes = snapshot.data!;
+              return ListView.builder(
+                itemCount: unavailableTimes.length,
+                itemBuilder: (context, index) {
+                  final horario = unavailableTimes[index];
+                  return ListTile(
+                    title: Text(horario.horarioTexto),
+                    trailing: IconButton(
+                      icon: Icon(Icons.delete),
+                      onPressed: () async {
+                        try {
+                          if(validacoes.verificarDesmarcarHorario(horario,_userType)){
+                            await AppointmentApi().desmarcarHorario(horario.id);
+                            setState(() {
+                              _selectedUnavailableTimes.remove(horario); 
+                            });
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Horário desmarcado com sucesso')),
+                            );
+                          }
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Erro ao desmarcar horário')),
+                          );
+                        }
+                      },
+                    ),
+                  );
+                },
               );
             },
           ),
@@ -90,16 +157,33 @@ class _BarberSchedulePageState extends State<BarberSchedulePage> {
   }
 
   void _saveSelectedTimes() async {
-    final DatabaseHelper dbHelper = DatabaseHelper.instance;
-    await dbHelper.deleteAllUnavailableTimes();
-    for (String time in _selectedUnavailableTimes) {
-      await dbHelper.insertUnavailableTime(time);
+    try {
+      for (Horario horario in _selectedUnavailableTimes) {
+        await AppointmentApi().marcarHorario(
+          horarioId: horario.horarioTexto,
+          data: '',
+          servico: 'Cancelado',
+          valor: 0,
+          minuto: 0,
+        );
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Horários indisponíveis salvos')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao salvar horários indisponíveis')),
+      );
     }
-    print('Horários indisponíveis salvos no banco de dados: $_selectedUnavailableTimes');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Horários indisponíveis salvos no banco de dados')),
-    );
   }
 
-  
+  void _handleNavigationTap(int index) {
+    if (index == 0) {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => ProfilePage()));
+    } else if (index == 1) {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage()));
+    } else {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => ScheduleServicePage()));
+    }
+  }
 }
