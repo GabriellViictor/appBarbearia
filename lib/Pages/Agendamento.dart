@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'package:app_barbearia/Pages/ProgilePage.dart';
+import 'package:app_barbearia/Utils/Validacoes.dart';
 import 'package:app_barbearia/api/ApointmentApi.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:app_barbearia/Pages/HomePage.dart';
 import 'package:app_barbearia/widgets/CustomBottomNavigationBar.dart';
 import 'package:app_barbearia/Model/Horario.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ScheduleServicePage extends StatefulWidget {
   const ScheduleServicePage({Key? key}) : super(key: key);
@@ -18,15 +20,23 @@ class _ScheduleServicePageState extends State<ScheduleServicePage> {
   DateTime _selectedDay = DateTime.now();
   Set<String> _selectedServices = {};
   String? _selectedTime;
+    String? _userType;
+
+  Future<void> _loadUser() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _userType = prefs.getString('userType');
+    });
+  }
 
   final List<Map<String, dynamic>> services = [
     {'name': 'Corte de Cabelo', 'price': 30.0, 'duration': '30 min'},
     {'name': 'Barba', 'price': 20.0, 'duration': '20 min'}
   ];
 
-  List<String> _availableTimes = []; // Lista de horários disponíveis para a data selecionada
+  List<String> _availableTimes = []; 
 
-  final AppointmentApi _api = AppointmentApi(); // Instância da classe AppointmentApi
+  final AppointmentApi _api = AppointmentApi();
 
   @override
   void initState() {
@@ -225,6 +235,8 @@ Future<void> _loadAvailableTimes() async {
   }
 
 void _saveAppointment() async {
+  Validacoes validacoes = new Validacoes();
+
   try {
     if (_selectedServices.isEmpty || _selectedTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -233,18 +245,25 @@ void _saveAppointment() async {
       return;
     }
 
-    // Obtenha os detalhes do serviço selecionado (exemplo simples usando o primeiro serviço selecionado)
+    Horario horarioTeste= Horario(
+      id: "",
+      horarioId: _selectedTime as String,
+      horarioTexto: _selectedTime as String,
+      disponivel: true,
+    );
+    if(!validacoes.verificaMarcarHorario(horarioTeste,_userType)){
+      return;
+    }
+
     final selectedService = services.firstWhere((service) => _selectedServices.contains(service['name']));
     final String servico = selectedService['name'];
     final double valor = selectedService['price'];
     final int minuto = int.parse(selectedService['duration'].split(' ')[0]); // Extrai minutos do tempo
 
-    // Crie a data no formato desejado (YYYY-MM-DD)
     String data = '${_selectedDay.year}-${_selectedDay.month.toString().padLeft(2, '0')}-${_selectedDay.day.toString().padLeft(2, '0')}';
 
-    // Chame o método para marcar o horário usando a API
     await _api.marcarHorario(
-      horarioId: _selectedTime!, // Supondo que _selectedTime já foi selecionado
+      horarioId: _selectedTime!, 
       data: data,
       servico: servico,
       valor: valor,
@@ -255,7 +274,6 @@ void _saveAppointment() async {
       SnackBar(content: Text('Serviço agendado para $_selectedDay às $_selectedTime')),
     );
 
-    // Redirecione para a página inicial após o agendamento
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (context) => HomePage()),

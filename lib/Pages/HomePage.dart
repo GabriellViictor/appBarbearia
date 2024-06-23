@@ -1,6 +1,7 @@
 import 'package:app_barbearia/Pages/Agendamento.dart';
 import 'package:app_barbearia/Pages/AgendamentoBarbeiro.dart';
 import 'package:app_barbearia/Pages/LoginPage.dart';
+import 'package:app_barbearia/Utils/Validacoes.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app_barbearia/widgets/CustomBottomNavigationBar.dart';
@@ -188,13 +189,16 @@ class _HomePageState extends State<HomePage> {
             ),
             TextButton(
               onPressed: () {
-                AppointmentApi().desmarcarHorario(agendamento.horarioTexto).then((message) {
+                Validacoes validacoes = new Validacoes();
+                if(validacoes.verificarDesmarcarHorario(agendamento,_userType)) {
+                  AppointmentApi().desmarcarHorario(agendamento.horarioTexto).then((message) {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
                   _refreshHorarios(); 
                   Navigator.of(context).pop(); 
                 }).catchError((error) {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao cancelar: $error')));
                 });
+                }
               },
               child: const Text('Confirmar'),
             ),

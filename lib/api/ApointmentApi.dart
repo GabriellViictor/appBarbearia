@@ -4,30 +4,31 @@ import 'package:app_barbearia/Model/Horario.dart';
 
 class AppointmentApi {
   static const String baseUrl = 'http://54.234.198.193:3333';
+  final http.Client client;
 
-Future<List<Horario>> getHorariosDisponiveis() async {
-  final response = await http.get(Uri.parse('$baseUrl/horarios-disponiveis'));
-  
-  if (response.statusCode == 200) {
-    List<dynamic> responseData = jsonDecode(response.body);
+  // Construtor padrão
+  AppointmentApi({http.Client? client}) : client = client ?? http.Client();
 
-    List<Horario> horarios = responseData.map((json) => Horario.fromJsonDisponivel({
-      'horario': json['horario'],
-      'disponivel': json['disponivel'],
-    })).toList();
-    
-    return horarios;
-  } else {
-    throw Exception('Erro ao buscar horários disponíveis: ${response.statusCode}');
+  Future<List<Horario>> getHorariosDisponiveis() async {
+    final response = await client.get(Uri.parse('$baseUrl/horarios-disponiveis'));
+
+    if (response.statusCode == 200) {
+      List<dynamic> responseData = jsonDecode(response.body);
+
+      List<Horario> horarios = responseData.map((json) => Horario.fromJsonDisponivel({
+        'horario': json['horario'],
+        'disponivel': json['disponivel'],
+      })).toList();
+
+      return horarios;
+    } else {
+      throw Exception('Erro ao buscar horários disponíveis: ${response.statusCode}');
+    }
   }
-}
-
-
-
 
   Future<List<Horario>> getHorariosIndisponiveis() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/horarios-indisponiveis'));
+      final response = await client.get(Uri.parse('$baseUrl/horarios-indisponiveis'));
 
       if (response.statusCode == 200) {
         List<dynamic> body = json.decode(response.body);
@@ -44,7 +45,7 @@ Future<List<Horario>> getHorariosDisponiveis() async {
 
   Future<List<Horario>> getAgendamentos() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/agendamentos'));
+      final response = await client.get(Uri.parse('$baseUrl/agendamentos'));
 
       if (response.statusCode == 200) {
         List<dynamic> body = json.decode(response.body);
@@ -73,7 +74,7 @@ Future<List<Horario>> getHorariosDisponiveis() async {
       'horario': {
         '_id': horarioId,
         'horarioTexto': '',
-        'disponivel': true, 
+        'disponivel': true,
       },
       'data': data,
       'servico': servico,
@@ -82,7 +83,7 @@ Future<List<Horario>> getHorariosDisponiveis() async {
     });
 
     try {
-      final response = await http.post(uri, headers: headers, body: body);
+      final response = await client.post(uri, headers: headers, body: body);
       if (response.statusCode == 200) {
         print('Horário marcado com sucesso');
       } else {
@@ -100,7 +101,7 @@ Future<List<Horario>> getHorariosDisponiveis() async {
     String body = jsonEncode({'horario': {'_id': horarioId}});
 
     try {
-      final response = await http.post(uri, headers: headers, body: body);
+      final response = await client.post(uri, headers: headers, body: body);
       if (response.statusCode == 200) {
         Map<String, dynamic> responseBody = json.decode(response.body);
         return responseBody['message'];

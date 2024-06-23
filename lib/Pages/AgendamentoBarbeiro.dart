@@ -1,9 +1,11 @@
 import 'package:app_barbearia/Pages/Agendamento.dart';
 import 'package:app_barbearia/Pages/ProgilePage.dart';
+import 'package:app_barbearia/Utils/Validacoes.dart';
 import 'package:app_barbearia/api/ApointmentApi.dart';
 import 'package:flutter/material.dart';
 import 'package:app_barbearia/widgets/CustomBottomNavigationBar.dart';
 import 'package:app_barbearia/Model/Horario.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'HomePage.dart';
 
 class BarberSchedulePage extends StatefulWidget {
@@ -17,6 +19,15 @@ class _BarberSchedulePageState extends State<BarberSchedulePage> {
   late Future<List<Horario>> _availableTimesFuture;
   late Future<List<Horario>> _unavailableTimesFuture;
   List<Horario> _selectedUnavailableTimes = [];
+  String? _userType;
+
+
+  Future<void> _loadUser() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _userType = prefs.getString('userType');
+    });
+  }
 
   @override
   void initState() {
@@ -45,6 +56,8 @@ class _BarberSchedulePageState extends State<BarberSchedulePage> {
   }
 
   Widget _buildBody() {
+    Validacoes validacoes = new Validacoes();
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -117,13 +130,15 @@ class _BarberSchedulePageState extends State<BarberSchedulePage> {
                       icon: Icon(Icons.delete),
                       onPressed: () async {
                         try {
-                          await AppointmentApi().desmarcarHorario(horario.id); // Chama a API para desmarcar o horário
-                          setState(() {
-                            _selectedUnavailableTimes.remove(horario); // Remove localmente da lista de horários indisponíveis
-                          });
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Horário desmarcado com sucesso')),
-                          );
+                          if(validacoes.verificarDesmarcarHorario(horario,_userType)){
+                            await AppointmentApi().desmarcarHorario(horario.id);
+                            setState(() {
+                              _selectedUnavailableTimes.remove(horario); 
+                            });
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Horário desmarcado com sucesso')),
+                            );
+                          }
                         } catch (e) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text('Erro ao desmarcar horário')),

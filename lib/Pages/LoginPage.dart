@@ -138,7 +138,7 @@ class _LoginPageState extends State<LoginPage> {
       if (response.ok) {
         
         SharedPreferences prefs = await SharedPreferences.getInstance();
-        await prefs.setString('userType', login);
+        await prefs.setString('userType', login); //usuario1 ou usuario2
         
         Navigator.push(
           context,

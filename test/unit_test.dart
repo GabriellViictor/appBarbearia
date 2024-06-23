@@ -1,48 +1,96 @@
-import 'dart:convert';
-import 'package:app_barbearia/api/ApointmentApi.dart';
+import 'package:app_barbearia/Utils/Validacoes.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mockito/mockito.dart';
-import 'package:http/http.dart' as http;
 import 'package:app_barbearia/Model/Horario.dart';
 
-// Classe mock para http.Client
-class MockClient extends Mock implements http.Client {}
-
 void main() {
-  group('AppointmentApi', () {
-    MockClient? client;
-    AppointmentApi? api;
+  test('Teste unitario', () {
+    Validacoes validacoes = new Validacoes();
+    const cliente = "usuario1";
+    const barbeiro = "usuario2";
 
-    setUp(() {
-      client = MockClient();
-      api = AppointmentApi();
-    });
+    //Teste 1 : TC_DISPONIBILIZAR_01
+    Horario horarioTeste1 = Horario(
+      id: "1",
+      horarioId: "09:00",
+      horarioTexto: "09:00",
+      disponivel: false,
+    );
+    expect(validacoes.verificaInserirHorarioDisponivel(horarioTeste1, barbeiro), true);
 
-    test('getHorariosDisponiveis retorna uma lista de horários disponíveis se a resposta for 200', () async {
-      final responseJson = jsonEncode([
-        {'horario': '08:00', 'disponivel': true},
-        {'horario': '09:00', 'disponivel': true}
-      ]);
+    //Teste 2 : TC_DISPONIBILIZAR_02
+    Horario horarioTeste2 = Horario(
+      id: "2",
+      horarioId: "09:00",
+      horarioTexto: "09:00",
+      disponivel: true,
+    );
+    expect(validacoes.verificaInserirHorarioDisponivel(horarioTeste2, barbeiro), false);
 
-      // Simula a resposta HTTP
-      when(client!.get(Uri.parse('http://54.234.198.193:3333/horarios-disponiveis')))
-        .thenAnswer((_) async => http.Response(responseJson, 200));
+    // Teste 3: TC_DISPONIBILIZAR_03 
+    Horario horarioTeste3 = Horario(
+      id: "3",
+      horarioId: "10:00",
+      horarioTexto: "10:00",
+      disponivel: false,
+    );
+    expect(validacoes.verificaInserirHorarioDisponivel(horarioTeste3, cliente), false);
 
-      List<Horario> horarios = await api!.getHorariosDisponiveis();
 
-      expect(horarios.length, 2);
-      expect(horarios[0].horarioTexto, '08:00');
-      expect(horarios[0].disponivel, true);
-      expect(horarios[1].horarioTexto, '09:00');
-      expect(horarios[1].disponivel, true);
-    });
+    // Teste 4: TC_AGENDAR_01
+    Horario horarioTeste4 = Horario(
+      id: "4",
+      horarioId: "10:00",
+      horarioTexto: "10:00",
+      disponivel: true,
+    );
+    expect(validacoes.verificaMarcarHorario(horarioTeste4, cliente), true);
 
-    test('getHorariosDisponiveis lança uma exceção se a resposta não for 200', () {
-      // Simula a resposta HTTP
-      when(client!.get(Uri.parse('http://54.234.198.193:3333/horarios-disponiveis')))
-        .thenAnswer((_) async => http.Response('Erro', 404));
+    // Teste 5: TC_AGENDAR_02
+    Horario horarioTeste5 = Horario(
+      id: "5",
+      horarioId: "10:00",
+      horarioTexto: "10:00",
+      disponivel: false,
+    );
+    expect(validacoes.verificaMarcarHorario(horarioTeste5, cliente), false);
 
-      expect(api!.getHorariosDisponiveis(), throwsException);
-    });
+
+    // Teste 6: TC_AGENDAR_03
+    Horario horarioTeste6 = Horario(
+      id: "6",
+      horarioId: "10:00",
+      horarioTexto: "10:00",
+      disponivel: false,
+    );
+    expect(validacoes.verificaMarcarHorario(horarioTeste6, cliente), false);
+    
+    // Teste 7: TC_DESMARCAR_01
+    Horario horarioTeste7 = Horario(
+      id: "7",
+      horarioId: "10:00",
+      horarioTexto: "10:00",
+      disponivel: false,
+    );
+    expect(validacoes.verificarDesmarcarHorario(horarioTeste7, cliente), true);
+
+    // Teste 8: TC_DESMARCAR_02
+    Horario horarioTeste8 = Horario(
+      id: "8",
+      horarioId: "10:00",
+      horarioTexto: "10:00",
+      disponivel: false,
+    );
+    expect(validacoes.verificarDesmarcarHorario(horarioTeste8, barbeiro), true);
+
+    // Teste 9: TC_DESMARCAR_03
+    Horario horarioTeste9 = Horario(
+      id: "9",
+      horarioId: "10:00",
+      horarioTexto: "10:00",
+      disponivel: true,
+    );
+    expect(validacoes.verificarDesmarcarHorario(horarioTeste9, cliente), false);
+  
+   
   });
 }

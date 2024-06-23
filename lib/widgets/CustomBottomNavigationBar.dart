@@ -5,7 +5,7 @@ class CustomBottomNavigationBar extends StatelessWidget {
   final ValueChanged<int> onTap;
   final String userType;
 
-  CustomBottomNavigationBar({
+  const CustomBottomNavigationBar({
     required this.currentIndex,
     required this.onTap,
     required this.userType,
@@ -14,23 +14,23 @@ class CustomBottomNavigationBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     List<BottomNavigationBarItem> items = [
-      BottomNavigationBarItem(
+      const BottomNavigationBarItem(
         icon: Icon(Icons.exit_to_app),
         label: 'Logout',
       ),
-      BottomNavigationBarItem(
+      const BottomNavigationBarItem(
         icon: Icon(Icons.home),
         label: 'Home',
       ),
     ];
 
     if (userType == 'usuario1') {
-      items.add(BottomNavigationBarItem(
+      items.add(const BottomNavigationBarItem(
         icon: Icon(Icons.schedule), // Ícone para agendamento de cliente
         label: 'Agendamento Cliente',
       ));
     } else if (userType == 'usuario2') {
-      items.add(BottomNavigationBarItem(
+      items.add(const BottomNavigationBarItem(
         icon: Icon(Icons.schedule), // Ícone para agendamento de barbeiro
         label: 'Agendamento Barbeiro',
       ));
