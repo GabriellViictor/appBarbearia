@@ -34,43 +34,25 @@ class _ScheduleServicePageState extends State<ScheduleServicePage> {
     _loadAvailableTimes();
   }
 
-  Future<void> _loadAvailableTimes() async {
-    try {
-      List<Horario> availableTimes = await _api.getHorariosDisponiveis();
-      setState(() {
-        _availableTimes = availableTimes.map((horario) => horario.horario).toList();
-      });
-    } catch (e) {
-      print('Erro ao carregar horários disponíveis: $e');
-    }
+Future<void> _loadAvailableTimes() async {
+  try {
+    print('Carregando horários disponíveis para $_selectedDay');
+    List<Horario> availableTimes = await _api.getHorariosDisponiveis();
+    
+    setState(() {
+      _availableTimes = availableTimes
+          .where((horario) => horario.disponivel) // Filtra apenas os horários disponíveis
+          .map((horario) => horario.horarioTexto)
+          .toList();
+      
+      print('Horários carregados: $_availableTimes');
+    });
+  } catch (e) {
+    print('Erro ao carregar horários disponíveis: $e');
   }
+}
 
-  Future<void> _markTime(String time) async {
-    String baseUrl = 'http://54.234.198.193:3333';
-    String endpoint = '/marcar-horario';
-    Uri uri = Uri.parse(baseUrl + endpoint);
-    Map<String, String> headers = {'Content-Type': 'application/json'};
-    String body = jsonEncode({'horario': time});
 
-    try {
-      final response = await http.post(uri, headers: headers, body: body);
-      if (response.statusCode == 200) {
-        setState(() {
-          _selectedTime = time;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Horário marcado para $_selectedDay às $_selectedTime')),
-        );
-      } else {
-        throw Exception('Erro ao marcar horário: ${response.body}');
-      }
-    } catch (e) {
-      print('Erro ao conectar ao servidor: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Erro ao conectar ao servidor')),
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -256,23 +238,49 @@ class _ScheduleServicePageState extends State<ScheduleServicePage> {
     );
   }
 
-  void _saveAppointment() async {
-    try {
-      await _api.marcarHorario(_selectedTime!);
+void _saveAppointment() async {
+  try {
+    if (_selectedServices.isEmpty || _selectedTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Serviço agendado para $_selectedDay às $_selectedTime')),
+        const SnackBar(content: Text('Por favor, selecione um serviço e um horário')),
       );
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => HomePage()),
-      );
-    } catch (e) {
-      print('Erro ao marcar horário: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Erro ao marcar horário')),
-      );
+      return;
     }
+
+    // Obtenha os detalhes do serviço selecionado (exemplo simples usando o primeiro serviço selecionado)
+    final selectedService = services.firstWhere((service) => _selectedServices.contains(service['name']));
+    final String servico = selectedService['name'];
+    final double valor = selectedService['price'];
+    final int minuto = int.parse(selectedService['duration'].split(' ')[0]); // Extrai minutos do tempo
+
+    // Crie a data no formato desejado (YYYY-MM-DD)
+    String data = '${_selectedDay.year}-${_selectedDay.month.toString().padLeft(2, '0')}-${_selectedDay.day.toString().padLeft(2, '0')}';
+
+    // Chame o método para marcar o horário usando a API
+    await _api.marcarHorario(
+      horarioId: _selectedTime!, // Supondo que _selectedTime já foi selecionado
+      data: data,
+      servico: servico,
+      valor: valor,
+      minuto: minuto,
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Serviço agendado para $_selectedDay às $_selectedTime')),
+    );
+
+    // Redirecione para a página inicial após o agendamento
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => HomePage()),
+    );
+  } catch (e) {
+    print('Erro ao marcar horário: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Erro ao marcar horário')),
+    );
   }
+}
 
   Future<void> _selectDate() async {
     DateTime? picked = await showDatePicker(

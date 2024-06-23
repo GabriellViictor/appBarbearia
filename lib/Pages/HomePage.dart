@@ -1,11 +1,11 @@
 import 'package:app_barbearia/Pages/Agendamento.dart';
-import 'package:app_barbearia/Pages/AgendamentoBarbeiro.dart';
 import 'package:app_barbearia/Pages/ProgilePage.dart';
 import 'package:app_barbearia/api/ApointmentApi.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app_barbearia/widgets/CustomBottomNavigationBar.dart';
 import 'package:app_barbearia/Model/Horario.dart';
+import 'package:app_barbearia/Pages/AgendamentoBarbeiro.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -17,7 +17,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   String? _username;
   String? _userType;
-  late Future<List<Horario>> _horariosIndisponiveis;
+  late Future<List<Horario>> _agendamentos;
 
   @override
   void initState() {
@@ -36,7 +36,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _refreshHorarios() async {
     setState(() {
-      _horariosIndisponiveis = AppointmentApi().getHorariosIndisponiveis();
+      _agendamentos = AppointmentApi().getAgendamentos();
     });
   }
 
@@ -56,7 +56,7 @@ class _HomePageState extends State<HomePage> {
 
   Widget _body() {
     return FutureBuilder<List<Horario>>(
-      future: _horariosIndisponiveis,
+      future: _agendamentos,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(child: CircularProgressIndicator());
@@ -66,27 +66,25 @@ class _HomePageState extends State<HomePage> {
           return Center(child: Text('Nenhum horário agendado'));
         }
 
-        List<Horario> horarios = snapshot.data!;
+        List<Horario> agendamentos = snapshot.data!;
         return ListView.builder(
           padding: const EdgeInsets.all(16.0),
-          itemCount: horarios.length,
+          itemCount: agendamentos.length,
           itemBuilder: (context, index) {
-            Horario horario = horarios[index];
-            return _buildAppointmentCard(horario);
+            Horario agendamento = agendamentos[index];
+            return _buildAppointmentCard(agendamento);
           },
         );
       },
     );
   }
 
-  Widget _buildAppointmentCard(Horario horario) {
-    String? time;
-
-    try {
-      time = horario.horario;  
-    } catch (e) {
-      time = 'Hora inválida';
-    }
+  Widget _buildAppointmentCard(Horario agendamento) {
+    String time = agendamento.horarioTexto ?? 'Hora inválida';
+    String service = agendamento.servico ?? 'Serviço';
+    String date = agendamento.data ?? 'Data';
+    double? valor = agendamento.valor;
+    int? minuto = agendamento.minuto;
 
     return Card(
       elevation: 4.0,
@@ -96,7 +94,7 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
@@ -110,34 +108,36 @@ class _HomePageState extends State<HomePage> {
                   children: [
                     Icon(Icons.attach_money, color: Colors.green),
                     SizedBox(width: 4.0),
-                    Text('R\$ 30,00', style: TextStyle(fontSize: 16.0, color: Colors.green)),
+                    Text('R\$ $valor', style: TextStyle(fontSize: 16.0, color: Colors.green)),
                   ],
                 ),
               ],
             ),
             SizedBox(height: 8.0),
-            const Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Icon(Icons.access_time, color: Colors.grey),
                 SizedBox(width: 4.0),
-                Text('30 min', style: TextStyle(fontSize: 16.0, color: Colors.grey)),
+                Text('$minuto min', style: TextStyle(fontSize: 16.0, color: Colors.grey)),
               ],
             ),
-            const SizedBox(height: 8.0),
+            SizedBox(height: 8.0),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 4.0),
+                    SizedBox(height: 4.0),
                     Text('Hora: $time', style: TextStyle(fontSize: 16.0)),
+                    Text('Serviço: $service', style: TextStyle(fontSize: 16.0)),
+                    Text('Data: $date', style: TextStyle(fontSize: 16.0)),
                   ],
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    _handleCancelAppointment(horario);
+                    _handleCancelAppointment(agendamento);
                   },
                   style: ButtonStyle(
                     backgroundColor: MaterialStateProperty.all(Colors.red),
@@ -170,37 +170,39 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _handleCancelAppointment(Horario horario) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Cancelar Agendamento'),
-          content: Text('Deseja realmente cancelar este agendamento?'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text('Cancelar'),
-            ),
-            TextButton(
-              onPressed: () {
-                AppointmentApi().desmarcarHorario(horario.horario).then((message) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
-                  _refreshHorarios(); // Atualizar a lista de horários
-                  Navigator.of(context).pop();
-                }).catchError((error) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao cancelar: $error')));
-                });
-              },
-              child: const Text('Confirmar'),
-            ),
-          ],
-        );
-      },
-    );
-  }
+void _handleCancelAppointment(Horario agendamento) {
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: Text('Cancelar Agendamento'),
+        content: Text('Deseja realmente cancelar este agendamento?'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () {
+              // Chamar desmarcarHorario e aguardar a conclusão
+              AppointmentApi().desmarcarHorario(agendamento.horarioTexto).then((message) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+                _refreshHorarios(); // Atualizar a lista de horários
+                Navigator.of(context).pop(); // Fechar o AlertDialog
+              }).catchError((error) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao cancelar: $error')));
+              });
+            },
+            child: const Text('Confirmar'),
+          ),
+        ],
+      );
+    },
+  );
+}
+
 
   void _handleProfileButton() {
     Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => ProfilePage()));
