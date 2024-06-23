@@ -41,7 +41,7 @@ Future<void> _loadAvailableTimes() async {
     
     setState(() {
       _availableTimes = availableTimes
-          .where((horario) => horario.disponivel) // Filtra apenas os horários disponíveis
+          .where((horario) => horario.disponivel) 
           .map((horario) => horario.horarioTexto)
           .toList();
       
@@ -52,8 +52,6 @@ Future<void> _loadAvailableTimes() async {
   }
 }
 
-
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -63,19 +61,7 @@ Future<void> _loadAvailableTimes() async {
       body: _buildBody(),
       bottomNavigationBar: CustomBottomNavigationBar(
         currentIndex: 2,
-        onTap: (index) {
-          if (index == 1) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => HomePage()),
-            );
-          } else if (index == 0) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => ProfilePage()),
-            );
-          }
-        },
+        onTap: _handleNavigationTap, userType: '',
       ),
     );
   }
@@ -295,6 +281,14 @@ void _saveAppointment() async {
         _selectedDay = picked;
         _loadAvailableTimes();
       });
+    }
+  }
+
+  void _handleNavigationTap(int index) {
+    if (index == 0) {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => ProfilePage()));
+    } else if (index == 1) {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage()));
     }
   }
 }

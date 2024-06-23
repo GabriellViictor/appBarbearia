@@ -31,7 +31,7 @@ Future<List<Horario>> getHorariosDisponiveis() async {
 
       if (response.statusCode == 200) {
         List<dynamic> body = json.decode(response.body);
-        List<Horario> horarios = body.map((dynamic item) => Horario.fromJson(item)).toList();
+        List<Horario> horarios = body.map((dynamic item) => Horario.fromJsonDisponivel(item)).toList();
         return horarios;
       } else {
         throw Exception('Erro ao buscar horários indisponíveis: ${response.statusCode}');
@@ -72,8 +72,8 @@ Future<List<Horario>> getHorariosDisponiveis() async {
     String body = jsonEncode({
       'horario': {
         '_id': horarioId,
-        'horarioTexto': '', // Coloque o horarioTexto correto se necessário
-        'disponivel': true, // Se o horário estiver disponível ao marcar
+        'horarioTexto': '',
+        'disponivel': true, 
       },
       'data': data,
       'servico': servico,

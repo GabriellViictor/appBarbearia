@@ -1,11 +1,11 @@
 import 'package:app_barbearia/Pages/Agendamento.dart';
-import 'package:app_barbearia/Pages/ProgilePage.dart';
-import 'package:app_barbearia/api/ApointmentApi.dart';
+import 'package:app_barbearia/Pages/AgendamentoBarbeiro.dart';
+import 'package:app_barbearia/Pages/LoginPage.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app_barbearia/widgets/CustomBottomNavigationBar.dart';
+import 'package:app_barbearia/api/ApointmentApi.dart';
 import 'package:app_barbearia/Model/Horario.dart';
-import 'package:app_barbearia/Pages/AgendamentoBarbeiro.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -50,6 +50,7 @@ class _HomePageState extends State<HomePage> {
       bottomNavigationBar: CustomBottomNavigationBar(
         currentIndex: 1,
         onTap: _handleNavigationTap,
+        userType: _userType ?? '',
       ),
     );
   }
@@ -154,57 +155,52 @@ class _HomePageState extends State<HomePage> {
 
   void _handleNavigationTap(int index) {
     if (index == 0) {
-      _handleProfileButton();
+      _handleLogout();
     } else if (index == 1) {
-      _handleScheduleButton();
-    } else {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const ScheduleServicePage()));
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage()));
+    } else if (_userType == 'usuario1' && index == 2) {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => ScheduleServicePage()));
+    } else if (_userType == 'usuario2' && index == 2) {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => BarberSchedulePage()));
     }
   }
 
-  void _handleScheduleButton() {
-    if (_username == 'usuario1') {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const ScheduleServicePage()));
-    } else if (_username == 'usuario2') {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const BarberSchedulePage()));
-    }
+  void _handleLogout() {
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.clear();
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => LoginPage()));
+    });
   }
 
-void _handleCancelAppointment(Horario agendamento) {
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        title: Text('Cancelar Agendamento'),
-        content: Text('Deseja realmente cancelar este agendamento?'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () {
-              // Chamar desmarcarHorario e aguardar a conclusão
-              AppointmentApi().desmarcarHorario(agendamento.horarioTexto).then((message) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
-                _refreshHorarios(); // Atualizar a lista de horários
-                Navigator.of(context).pop(); // Fechar o AlertDialog
-              }).catchError((error) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao cancelar: $error')));
-              });
-            },
-            child: const Text('Confirmar'),
-          ),
-        ],
-      );
-    },
-  );
-}
-
-
-  void _handleProfileButton() {
-    Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => ProfilePage()));
+  void _handleCancelAppointment(Horario agendamento) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Cancelar Agendamento'),
+          content: Text('Deseja realmente cancelar este agendamento?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () {
+                AppointmentApi().desmarcarHorario(agendamento.horarioTexto).then((message) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+                  _refreshHorarios(); 
+                  Navigator.of(context).pop(); 
+                }).catchError((error) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao cancelar: $error')));
+                });
+              },
+              child: const Text('Confirmar'),
+            ),
+          ],
+        );
+      },
+    );
   }
 }

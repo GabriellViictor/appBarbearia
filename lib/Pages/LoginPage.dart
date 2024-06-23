@@ -5,6 +5,7 @@ import 'package:app_barbearia/Pages/HomePage.dart';  // Certifique-se de importa
 import 'package:app_barbearia/widgets/Button.dart';
 import 'package:app_barbearia/widgets/Field.dart';
 import 'package:app_barbearia/widgets/FieldPassword.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginPage extends StatefulWidget {
   @override
@@ -132,9 +133,13 @@ class _LoginPageState extends State<LoginPage> {
 
     try {
       final response = await _loginService.login(login, senha);
+      
 
       if (response.ok) {
-        // Login bem-sucedido
+        
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        await prefs.setString('userType', login);
+        
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => HomePage()),  
